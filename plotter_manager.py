@@ -1,6 +1,6 @@
+import logging
 import threading
-from plotter_job import PlotterJob
-from xy_plotter import XYPlotter
+from plotter.xy_plotter import XYPlotter
 
 
 class PlotterManager:
@@ -25,11 +25,12 @@ class PlotterManager:
             self._job_thread.join(5) # wait 5 seconds at most for thread to stop.
             return self._job_thread.is_alive()
 
-    def start_job(self, job: PlotterJob) -> bool:
+    def start_job(self, job) -> bool:
         with self._lock:
             if self._is_job_active:
                 return False
 
+            logging.info(f"starting job : {job}")
             self._job = job
             self._is_job_active = True
 
@@ -41,7 +42,7 @@ class PlotterManager:
 
     def _run_job_wrapper(self):
         try:
-
-            self._job.run()  # Assuming PlotterJob has a run() method
+            logging.info(f"running job : {self._job}")
+            self._job.run()
         finally:
             self._is_job_active = False
