@@ -1,14 +1,20 @@
+import logging
 from typing import Optional
 
 import pigpio
 
+from plotter.gpio_pin_base import GPIOPinBase
 
-class GPIO_Pin:
+
+class GPIO_Pin(GPIOPinBase):
     def __init__(self, pin_number : int, pi : pigpio.pi, pin_type : int):
         self._pin_number = pin_number
         self._pi = pi
         self._pin_type = pin_type
         self.configure()
+
+    def get_pin(self) -> int:
+        return self._pin_number
 
     def configure(self) -> bool:
         return self._pi.set_mode(self._pin_number, self._pin_type) == 0

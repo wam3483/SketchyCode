@@ -1,21 +1,25 @@
-import platform
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-from flask import Flask, request, send_file, render_template
-from PIL import Image
 import io
+
+from data.Constants import pigpio_singleton
+from routes.namespaces import diagnostic_namespace
+from routes.namespaces import plotter_namespace
+
+import pigpio
+from PIL import Image
+from flask import Flask, request, send_file, render_template
 from flask_restx import Api, Resource, fields, Namespace
 
-from plotter_manager import PlotterManager
-from plotter_move_job import PlotterMoveJob
-from plotter.xy_plotter import XYPlotter
-import logging
-import pigpio
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+import routes.ConfigureSettingsRoute
+import routes.HardwareSettingsRoute
+import routes.plotter.ResetRoute
+import routes.plotter.DrawRectangleRoute
+import routes.plotter.MovePlotterRoute
 
 image_ns = Namespace('image', description='Image processing endpoints')
 sketch_ns = Namespace("sketch", description="Draw things on a physical etch a sketch")
-test_ns = Namespace("test", description="operations to test auto etch a sketch")
 
 app = Flask(__name__)
 api = Api(
@@ -25,22 +29,13 @@ api = Api(
     description="API for controlling an Etch A Sketch",
     doc="/docs"  # Swagger UI path
 )
-_on_raspberry = platform.system() == 'Linux'
-pigpio_singleton : None | pigpio.pi
-if _on_raspberry:
-    pigpio_singleton = pigpio.pi()
-plotter = XYPlotter(pigpio_singleton, 3200,.01,1,
-                    17, 27,22,
-                    0, 0, 0)
-plotterManager = PlotterManager(plotter)
-
 
 # Home route to render HTML page
 @app.route('/')
 def home():
     return render_template('index.html')
 
-@test_ns.route('/controlPin')
+@diagnostic_namespace.route('/controlPin')
 class ControlPin(Resource):
     set_pin_model = api.model('SetPinRequest', {
         'pin': fields.Integer(required=True, description='Which GPIO pin to control'),
@@ -111,37 +106,6 @@ class ControlPin(Resource):
                 'success': False,
                 'message': f'Exception while reading pin: {str(e)}'
             }
-
-
-
-@test_ns.route('/move')
-class Test(Resource):
-    move_model = api.model('MoveCommand', {
-        'x': fields.Integer(required=True, description='Target X coordinate'),
-        'y': fields.Integer(required=True, description='Target Y coordinate'),
-    })
-
-    response_model = api.model('MoveResponse', {
-        'success': fields.Boolean(description='whether movement completed successfully'),
-        'message': fields.String(description='additional information concerning result of request')
-    })
-
-    @api.expect(move_model)
-    @api.marshal_with(response_model)
-    def post(self):
-        data = api.payload
-        x, y = data['x'], data['y']
-        result = False
-        if x != 0:
-            result = plotterManager.start_job(PlotterMoveJob(plotter,[(x,0)], 1))
-        if y != 0:
-            result = plotterManager.start_job(PlotterMoveJob(plotter,[(0,y)], 1))
-        data = {
-            'success': result,
-            'message': ''
-        }
-        return data
-
 
 # Define a file upload field using Flask-RESTX fields
 upload_parser = api.parser()
@@ -260,8 +224,9 @@ class SketchBitmap(Resource):
 #     buf.seek(0)
 #     return send_file(buf, mimetype='images/png')
 
+api.add_namespace(plotter_namespace)
 api.add_namespace(image_ns)
-api.add_namespace(test_ns)
+api.add_namespace(diagnostic_namespace)
 api.add_namespace(sketch_ns)
 
 if __name__ == '__main__':

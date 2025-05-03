@@ -1,138 +1,111 @@
-import pigpio
-import time
-from path_datatype import VectorPath, Vector
-import platform
-import warnings
 import logging
+
+import pigpio
+
+from dao.SettingsFileDao import SettingsFileDao
+from data.Utils import on_raspberry
+from plotter.gpio_pin_null import GPIOPinNull
+from plotter.path_datatype import Vector
+
+from plotter.stepper_motor import StepperMotor
+
+
+def _pixels_to_degrees(pixels : float, cycles_per_pixel : float) -> float:
+    return pixels * cycles_per_pixel * 360
+
 
 class XYPlotter:
 
-    def __init__(self, pi, steps_per_revolution : int,
-                 cycles_per_pixel: float,
-                 motor_cycles_per_sec : float,
-                 x_direction_pin : int, x_step_pin : int, x_enable_pin : int,
-                 y_direction_pin : int, y_step_pin : int, y_enable_pin : int):
+    def __init__(self,
+                 pi: pigpio.pi,
+                 x_cycles_per_pixel: float,
+                 y_cycles_per_pixel: float,
+                 x_motor : StepperMotor,
+                 y_motor : StepperMotor):
 
+        self.plotter_dimensions = (550, 400)
+
+        self.x_motor = x_motor
+        self.y_motor = y_motor
         self._pi = pi
+        self._x_cycles_per_pixel = x_cycles_per_pixel
+        self._y_cycles_per_pixel = y_cycles_per_pixel
+        self.invert_x = True
+        self.invert_y = False
 
-        self.plotter_dimensions = (640, 480)
+    @classmethod
+    def init_plotter(cls, pi: pigpio.pi, settings_repo : SettingsFileDao):
+        hardware_settings = settings_repo.get_hardware_settings()
+        config_settings = settings_repo.get_config_settings()
 
-        self._motor_steps_per_cycle = steps_per_revolution
-        self._motor_cycles_per_sec = motor_cycles_per_sec
-        self._cycles_per_pixel = cycles_per_pixel
+        motor_x = StepperMotor(pi, GPIOPinNull(), GPIOPinNull(), GPIOPinNull(),
+                               hardware_settings.stepsPerCycle, 0,"x-motor")
+        motor_y = StepperMotor(pi, GPIOPinNull(), GPIOPinNull(), GPIOPinNull(),
+                               hardware_settings.stepsPerCycle, 0,"y-motor")
+        if on_raspberry:
+            x_backlash_correction_steps = int((config_settings.xBacklashPixels * config_settings.xDegreesPerPixel) / 360 * hardware_settings.stepsPerCycle)
+            y_backlash_correction_steps = int((config_settings.yBacklashPixels * config_settings.yDegreesPerPixel) / 360 * hardware_settings.stepsPerCycle)
+            motor_x = StepperMotor.from_pins(pi,
+                                             hardware_settings.xDirectionPin,
+                                             hardware_settings.xStepPin,
+                                             hardware_settings.xEnablePin,
+                                             hardware_settings.stepsPerCycle,
+                                             x_backlash_correction_steps,
+                                             "x-motor")  # 17, 27, 22, 3200, "x_motor")
+            logging.info(f"x-motor initialized:"
+                         f"\n\tstepPin=[{hardware_settings.xStepPin}]"
+                         f"\n\tdirPin=[{hardware_settings.xDirectionPin}]"
+                         f"\n\tenablePin=[{hardware_settings.xEnablePin}]"
+                         f"\n\tstepsPerCycle=[{hardware_settings.stepsPerCycle}]"
+                         f"\n\tx-backlash-correction-steps=[{x_backlash_correction_steps}]")
+            motor_y = StepperMotor.from_pins(pi,
+                                             hardware_settings.yDirectionPin,
+                                             hardware_settings.yStepPin,
+                                             hardware_settings.yEnablePin,
+                                             hardware_settings.stepsPerCycle,
+                                             y_backlash_correction_steps,
+                                             "y-motor")  # 23, 24, 25, 3200, "y_motor")
+            logging.info(f"y-motor initialized:"
+                         f"\n\tstepPin=[{hardware_settings.yStepPin}]"
+                         f"\n\tdirPin=[{hardware_settings.yDirectionPin}]"
+                         f"\n\tenablePin=[{hardware_settings.yEnablePin}]"
+                         f"\n\tstepsPerCycle=[{hardware_settings.stepsPerCycle}]"
+                         f"\n\ty-backlash-correction-steps=[{y_backlash_correction_steps}]")
 
-        self._x_direction_pin = x_direction_pin
-        self._y_direction_pin = y_direction_pin
-        self._x_step_pin = x_step_pin
-        self._y_step_pin = y_step_pin
+        degrees_per_sec = config_settings.drawSpeed_PixelsPerSec * config_settings.xDegreesPerPixel
+        motor_x.set_speed(lambda alpha: degrees_per_sec)
+        motor_y.set_speed(lambda alpha: degrees_per_sec)
 
-        self._x_enable_pin = x_enable_pin
-        self._y_enable_pin = y_enable_pin
+        result = XYPlotter(pi,
+                           config_settings.xDegreesPerPixel / 360,
+                           config_settings.yDegreesPerPixel / 360,
+                           motor_x,
+                           motor_y)
+        return result
 
-        self._on_raspberry = platform.system() == 'Linux'
-        self._y_enabled = self._y_step_pin > 0 and self._y_direction_pin > 0 and self._y_enable_pin > 0 and self._on_raspberry
-        self._x_enabled = self._x_step_pin > 0 and self._x_direction_pin > 0 and self._x_enable_pin > 0 and self._on_raspberry
+    def move(self, pixel_vector : Vector):
+        x,y = pixel_vector
+        move_x = x != 0
+        move_y = y != 0
 
-        if self._x_enabled:
-            dir_mode_success = self._set_pin_mode(self._x_direction_pin, pigpio.OUTPUT)
-            step_mode_success = self._set_pin_mode(self._x_step_pin, pigpio.OUTPUT)
-            enable_mode_success = self._set_pin_mode(self._x_enable_pin, pigpio.OUTPUT)
+        if move_x:
+            x_degrees = _pixels_to_degrees(x, self._x_cycles_per_pixel)
 
-            if not dir_mode_success or not step_mode_success or not enable_mode_success:
-                warnings.warn(f"plotter x axis disabled, failed to config pins. "
-                              f"enable_pin[{self._x_enable_pin}]={enable_mode_success}"
-                              f"dir_pin[{self._x_direction_pin}]={dir_mode_success}, "
-                              f"step_pin[{self._x_step_pin}]={step_mode_success}")
-        else:
-            warnings.warn(f"plotter x axis disabled. onLinux=[{self._on_raspberry}],"
-                          f" stepPin=[{self._x_step_pin}],"
-                          f" dirPin=[{self._x_direction_pin}],"
-                          f" enablePin=[{self._x_enable_pin}]")
+            invert_x_mult = -1 if self.invert_x else 1
+            self.x_motor.rotate(x_degrees * invert_x_mult)
 
-        if self._y_enabled:
-            dir_mode_success = self._set_pin_mode(self._y_direction_pin, pigpio.OUTPUT)
-            step_mode_success = self._set_pin_mode(self._y_step_pin, pigpio.OUTPUT)
-            enable_mode_success = self._set_pin_mode(self._y_enable_pin, pigpio.OUTPUT)
+        if move_y:
+            y_degrees = _pixels_to_degrees(y, self._y_cycles_per_pixel)
 
-            if not dir_mode_success or not step_mode_success or not enable_mode_success:
-                warnings.warn(f"Plotter Y axis disabled, failed to config pins. "
-                              f"enable_pin[{self._y_enable_pin}] ready={enable_mode_success}"
-                              f"dir_pin[{self._y_direction_pin}] ready={dir_mode_success}, "
-                              f"step_pin[{self._y_step_pin}] ready={step_mode_success}")
-            else:
-                logging.info("y axis configured")
-        else:
-            warnings.warn(f"Plotter Y axis disabled. Invalid configuration. onLinux=[{self._on_raspberry}],"
-                          f" stepPin=[{self._y_step_pin}],"
-                          f" dirPin=[{self._y_direction_pin}],"
-                          f" enablePin=[{self._y_enable_pin}]")
+            invert_y_mult = -1 if self.invert_y else 1
+            self.y_motor.rotate(y_degrees * invert_y_mult)
 
-    def move(self, vector : Vector):
-        # set direction for axis'
-        if self._on_raspberry:
-            x,y = vector
-            move_x = x != 0 and self._x_enabled
-            move_y = y != 0 and self._y_enabled
+    def reset_cursor(self):
+        width, height = self.plotter_dimensions
+        self.move(Vector(-width, 0))
+        self.move(Vector(-height, 0))
+        x_pixel_backlash = self.x_motor.backlash_correction_degrees() / 360 * self._x_cycles_per_pixel
+        y_pixel_backlash = self.y_motor.backlash_correction_degrees() / 360 * self._y_cycles_per_pixel
 
-            # enable motor, set direction.
-            if move_x:
-                x_dir = pigpio.HIGH if x > 0 else pigpio.LOW
-                self._set_pin(self._x_enable_pin, pigpio.HIGH)
-                self._set_pin(self._x_direction_pin, x_dir)
-                logging.info(f"GPIO set direction x pin[{self._x_direction_pin}] = {x_dir}")
-            if move_y:
-                y_dir = pigpio.HIGH if y > 0 else pigpio.LOW
-                self._set_pin(self._y_enable_pin, pigpio.HIGH)
-                self._set_pin(self._y_direction_pin, y_dir)
-                logging.info(f"GPIO set direction y pin[{self._y_direction_pin}] = {y_dir}")
-
-            #calculate delay time between each gpio step pin state change
-            steps_per_sec = self._motor_cycles_per_sec * self._motor_steps_per_cycle
-            step_delay_hz = 1 / steps_per_sec
-            logging.info(f"step delay = {step_delay_hz}hz")
-
-            if move_x:
-                x_num_steps = abs(x) * self._cycles_per_pixel * self._motor_steps_per_cycle
-                logging.info(f"movement will take {step_delay_hz * x_num_steps} sec")
-                logging.info(f"x steps = {int(x_num_steps)} = abs({x}) * {self._cycles_per_pixel} * {self._motor_steps_per_cycle}")
-                self._pulse_pin(int(x_num_steps), self._x_step_pin, step_delay_hz)
-                self._set_pin(self._x_enable_pin, pigpio.LOW)
-
-            if move_y:
-                y_num_steps = abs(y) * self._cycles_per_pixel * self._motor_steps_per_cycle
-                logging.info(f"y steps = {int(y_num_steps)} = abs({y}) * {self._cycles_per_pixel} * {self._motor_steps_per_cycle}")
-                logging.info(f"movement will take {step_delay_hz * y_num_steps}")
-                self._pulse_pin(int(y_num_steps), self._y_step_pin, step_delay_hz)
-                self._set_pin(self._y_enable_pin, pigpio.LOW)
-
-    def _pulse_pin(self, pulse_count: int, pin : int, delay_per_pulse : float):
-        delay_per_half_step = delay_per_pulse / 2
-        for x_step_count in range(int(pulse_count)):
-            if not self._set_pin(pin, pigpio.HIGH):
-                break
-            time.sleep(delay_per_half_step)
-
-            if not self._set_pin(pin, pigpio.LOW):
-                break
-            time.sleep(delay_per_half_step)
-
-    def _set_pin(self, pin : int, state : int) -> bool:
-        result = self._pi.write(pin, state)
-        if result != 0:
-            warnings.warn(f'failed setting pin[{pin}] = {state}. error code = {result}')
-        return result == 0
-
-    def _set_pin_mode(self,pin : int, mode : int) -> bool:
-        result = self._pi.set_mode(pin, mode)
-        if result != 0:
-            warnings.warn(f'failed setting MODE for pin[{pin}] = {mode}. error code = {result}')
-        return result == 0
-
-    def move_to_origin(self):
-        w,h = self.plotter_dimensions
-        self.move(Vector(-w, 0))
-        self.move(Vector(-h, 0))
-
-    def stop(self):
-        if self._on_raspberry:
-            self._pi.stop()
+        self.move(Vector(-x_pixel_backlash, 0))
+        self.move(Vector(0, -y_pixel_backlash))

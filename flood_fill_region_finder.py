@@ -1,7 +1,7 @@
 from PIL import Image
 from typing import List
 from collections import deque
-from path_datatype import Point, Region
+from plotter.path_datatype import Point, Region
 
 class FloodFillRegionFinder:
 

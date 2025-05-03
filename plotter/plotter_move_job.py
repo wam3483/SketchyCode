@@ -1,13 +1,12 @@
 import logging
 
-from path_datatype import VectorPath
+from plotter.path_datatype import VectorPath
 from plotter.xy_plotter import XYPlotter
 
 
 class PlotterMoveJob:
-    def __init__(self, plotter : XYPlotter, vector_path : VectorPath, step_speed_per_sec : float):
+    def __init__(self, plotter : XYPlotter, vector_path : VectorPath):
         self.vector_path = vector_path
-        self.step_speed = step_speed_per_sec
         self._plotter = plotter
 
     def run(self):
