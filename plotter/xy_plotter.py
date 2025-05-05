@@ -5,7 +5,7 @@ import pigpio
 from dao.SettingsFileDao import SettingsFileDao
 from data.Utils import on_raspberry
 from plotter.gpio_pin_null import GPIOPinNull
-from plotter.path_datatype import Vector
+from plotter.path.path_datatype import Vector
 
 from plotter.stepper_motor import StepperMotor
 

@@ -1,7 +1,7 @@
 from PIL import Image
 from typing import List
 from collections import deque
-from plotter.path_datatype import Point, Region
+from plotter.path.path_datatype import Point, Region
 
 class FloodFillRegionFinder:
 
@@ -20,10 +20,10 @@ class FloodFillRegionFinder:
         """
         pixel = self._img.getpixel(pixel_coord)
         if isinstance(pixel, int):
-            return pixel == 0
+            return pixel != 0
         else:
             x,y,z = pixel
-            luminosity = (x + y + z) / 255
+            luminosity = (x + y + z) / 3 / 255
             return luminosity < black_threshold
 
     def find_regions(self) -> List[Region]:
@@ -32,7 +32,7 @@ class FloodFillRegionFinder:
 
         :return: contiguous sets of black pixels from specified image
         """
-        regions = [Region]
+        regions = []
         visited_coords = set[Point]()
         for y in range(0, self._img.height):
             for x in range(0, self._img.width):
@@ -59,7 +59,7 @@ class FloodFillRegionFinder:
         """
         stack = deque()
         stack.append(pixel_coord)
-        selected_region = Region()
+        selected_region = list()
         while stack:
             next_pixel_coord = stack.pop()
             x,y = next_pixel_coord

@@ -1,6 +1,6 @@
 import logging
 
-from plotter.path_datatype import VectorPath
+from plotter.path.path_datatype import VectorPath
 from plotter.xy_plotter import XYPlotter
 
 
