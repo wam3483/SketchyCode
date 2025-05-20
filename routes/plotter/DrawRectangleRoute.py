@@ -3,6 +3,7 @@ from http import HTTPStatus
 from flask import request
 
 from data.Constants import plotterManager, plotter
+from data.Vector import Vector
 from plotter.plotter_move_job import PlotterMoveJob
 from flask_restx import Resource, fields
 
@@ -31,10 +32,10 @@ class DrawRectangleRoute(Resource):
         elif height <= 0:
             msg = 'height must be > 0'
         else:
-            top_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [(width, 0)]))
-            right_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [(0, height)]))
-            bottom_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [(-width, 0)]))
-            left_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [(0, -height)]))
+            top_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [Vector(width, 0)]))
+            right_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [Vector(0, height)]))
+            bottom_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [Vector(-width, 0)]))
+            left_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance, [Vector(0, -height)]))
             if top_result and right_result and bottom_result and left_result:
                 status_code = HTTPStatus.OK
             else:

@@ -3,9 +3,9 @@ import logging
 import pigpio
 
 from dao.SettingsFileDao import SettingsFileDao
+from data import Vector
 from data.Utils import on_raspberry
 from plotter.gpio_pin_null import GPIOPinNull
-from plotter.path.path_datatype import Vector
 
 from plotter.stepper_motor import StepperMotor
 
@@ -84,7 +84,8 @@ class XYPlotter:
         return result
 
     def move(self, pixel_vector : Vector):
-        x,y = pixel_vector
+        x = pixel_vector.x
+        y=pixel_vector.y
         move_x = x != 0
         move_y = y != 0
 

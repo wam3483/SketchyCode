@@ -8,8 +8,8 @@ from flask import Flask, render_template
 from flask_restx import Api, Namespace
 
 from routes.plotter import ResetRoute, MovePlotterRoute, DrawRectangleRoute, SketchImageRoute, GetTranslationVectorsRoute
-from routes.diagnostic import ConfigureSettingsRoute, ControlPinRoute, HardwareSettingsRoute
-from routes.image import ProcessImageRoute
+from routes.diagnostic import ConfigureSettingsRoute, ControlPinRoute, HardwareSettingsRoute, RenderPlottedImage
+from routes.image import PlotImageFromMovementPath #, ProcessImageRoute
 
 app = Flask(__name__)
 api = Api(

@@ -119,45 +119,6 @@ class StepperMotor:
                 warnings.warn(f"Motor [{self._name}]: Exception during wave send: {e}")
                 break
 
-    # def rotate(self, degrees : float):
-    #     logging.info(f"Motor [{self._name}]: set enablePin[{self._enable_pin.get_pin()}] HIGH")
-    #     if not self._enable_pin.write(True):
-    #         warnings.warn(f"Motor [{self._name}]: failed to set enable pin HIGH")
-    #         return
-    #
-    #     dir_state = degrees > 0
-    #
-    #     logging.info(f"Motor [{self._name}]: set dirPin[{self._dir_pin.get_pin()}] {dir_state}")
-    #     if not self._dir_pin.write(dir_state):
-    #         warnings.warn(f"Motor [{self._name}]: failed to set direction pin [{dir_state}]")
-    #
-    #     num_steps = int(self._steps_per_rotation * (abs(degrees) / 360))
-    #
-    #     startMotorVelocity = self._velocityFunc_degrees_per_sec(0)
-    #     log_step_delay = 1 / self._get_steps_per_second(startMotorVelocity)
-    #     logging.info(f"Motor [{self._name}] rotate: degrees=[{degrees}], steps=[{num_steps}], initalVel=[{startMotorVelocity}], stepDelay=[{log_step_delay}]")
-    #
-    #     for x_step_count in range(num_steps):
-    #         normalized_step_count = x_step_count / num_steps
-    #
-    #         degrees_per_sec = self._velocityFunc_degrees_per_sec(normalized_step_count)
-    #         step_delay_secs = 1 / self._get_steps_per_second(degrees_per_sec)
-    #
-    #         delay_per_half_step = step_delay_secs / 2
-    #
-    #         if not self._step_pin.write(True):
-    #             warnings.warn(f"Motor [{self._name}]: failed to toggle step pin HIGH")
-    #             break
-    #         time.sleep(delay_per_half_step)
-    #         if not self._step_pin.write(False):
-    #             warnings.warn(f"Motor [{self._name}]: failed to toggle step pin LOW")
-    #             break
-    #         time.sleep(delay_per_half_step)
-    #
-    #     logging.info(f"Motor [{self._name}]: set enablePin[{self._enable_pin.get_pin()}] LOW")
-    #     if not self._enable_pin.write(False):
-    #         warnings.warn(f"Motor [{self._name}]: failed to set enable pin LOW")
-
     def _get_steps_per_second(self, degrees_per_sec : float) -> int:
         num_rotations = degrees_per_sec / 360.0
         num_steps = self._steps_per_rotation * num_rotations

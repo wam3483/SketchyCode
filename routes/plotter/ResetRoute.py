@@ -1,5 +1,6 @@
 from data import Constants
 from data.Constants import plotterManager, plotter
+from data.Vector import Vector
 from plotter.plotter_move_job import PlotterMoveJob
 from flask_restx import Resource, fields
 
@@ -22,9 +23,9 @@ class PlotterReset(Resource):
         x_result = False
         y_result = False
         if x != 0:
-            x_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance,[(x,0)]))
+            x_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance,[Vector(x,0)]))
         if y != 0:
-            y_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance,[(0,y)]))
+            y_result = plotterManager.queue_job(PlotterMoveJob(plotter.instance,[Vector(0,y)]))
         msg = '' if x_result and y_result else f'Failed to queue movement: x_queued=[{x_result}], y_queued=[{y_result}]'
         data = {
             'success': x_result and y_result,

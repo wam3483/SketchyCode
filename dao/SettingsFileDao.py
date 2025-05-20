@@ -30,11 +30,12 @@ class SettingsFileDao:
             warnings.warn(f"Failed to load config settings. Filepath=[{self._config_settings_file_path}]: {e}")
 
         return ConfigSettings(
-            xBacklashPixels = 2.5,
-            yBacklashPixels = 2.5,
+            xBacklashPixels = 4,
+            yBacklashPixels = 4,
             xDegreesPerPixel = 3.8,
-            yDegreesPerPixel = 3.4,
-            drawSpeed_PixelsPerSec = 200
+            yDegreesPerPixel = 4.1,
+            drawSpeed_PixelsPerSec = 50,
+            overdraw_pixels=1
         )
 
     def set_hardware_settings(self, hardware_settings : HardwareSettings) -> bool:

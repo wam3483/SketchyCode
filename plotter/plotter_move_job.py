@@ -1,11 +1,12 @@
 import logging
+from typing import List
 
-from plotter.path.path_datatype import VectorPath
+from data import Vector
 from plotter.xy_plotter import XYPlotter
 
 
 class PlotterMoveJob:
-    def __init__(self, plotter : XYPlotter, vector_path : VectorPath):
+    def __init__(self, plotter : XYPlotter, vector_path : List[Vector]):
         self.vector_path = vector_path
         self._plotter = plotter
 

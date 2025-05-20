@@ -19,7 +19,9 @@ config_request = diagnostic_namespace.model('ConfigSettingsRequest', {
     'yDegreesPerPixel': fields.Float(required=True,
                                     description='number of degrees turned to travel 1 pixel'),
     'drawSpeed_PixelsPerSec': fields.Float(required=True,
-                                           description='how fast the plotter is moved in pixels per second')
+                                           description='how fast the plotter is moved in pixels per second'),
+     'overdrawPixels': fields.Float(required=True,
+                                            description='how many pixels to draw past each plotter movement')
 })
 config_response_model = diagnostic_namespace.model('ConfigSettingsResult', {
     'message': fields.String(description='details about the result of a configuration request')
